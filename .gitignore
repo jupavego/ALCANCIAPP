@@ -1,0 +1,9 @@
+﻿# archivos temporales y de trabajo
+__pycache__/
+*.pyc
+*.log
+*.blend1
+*.blend
+.vercel/
+node_modules/
+_chk.js
