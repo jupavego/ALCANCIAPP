@@ -217,6 +217,17 @@ main{align-items:stretch}
 .escudos button{min-width:0;aspect-ratio:1;border:2px solid var(--linea-suave);border-radius:14px;background:#fff;padding:8px;display:grid;place-items:center}
 .escudos button:hover,.escudos button[aria-pressed="true"]{background:var(--rosa-2);border-color:var(--linea)}
 .escudos img{width:100%;height:100%;object-fit:contain}
+
+/* ---------- ayudas (tooltips) ---------- */
+.pista{display:inline-grid;place-items:center;width:20px;height:20px;margin-left:8px;border-radius:50%;border:1.5px solid var(--linea);
+  background:var(--rosa-2);color:var(--linea);font:700 12px/1 'Nunito',sans-serif;padding:0;vertical-align:middle;cursor:help}
+.pista:hover{background:var(--rosa)}
+#tip{position:fixed;z-index:30;max-width:270px;background:var(--linea);color:#fff8ef;font:600 13px/1.4 'Nunito',sans-serif;
+  padding:8px 12px;border-radius:12px;box-shadow:0 8px 22px rgba(80,40,30,.28);pointer-events:none;opacity:0;transform:translateY(4px);
+  transition:opacity .15s,transform .15s}
+#tip.ver{opacity:1;transform:none}
+#tip::before{content:"";position:absolute;left:var(--flecha,50%);top:-6px;width:10px;height:10px;background:var(--linea);transform:translateX(-50%) rotate(45deg)}
+#tip.arriba::before{top:auto;bottom:-6px}
 footer{text-align:center;color:var(--linea-suave);font-size:13px;padding:0 16px 26px}
 footer b{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--linea)}
 .sr{position:absolute;left:-9999px}
@@ -924,6 +935,87 @@ $('#btn-pedir').addEventListener('click', async () => {
   catch (e) { avisar('No pudimos copiar el resumen. Descarga la foto y cuéntanos tu diseño en el chat.'); }
   window.open(WHATSAPP, '_blank', 'noopener');
 });
+
+/* ================= ayudas: cómo se usa cada pestaña y cada control ================= */
+const AYUDAS = {
+  '#tab-color': 'Pinta cada parte de la alcancía. Elige una parte (Cuerpo, Nariz, Orejas, Cola o Todo) y toca un color. También puedes darle un acabado al cuerpo.',
+  '#tab-detalles': 'Agrega un texto o un ícono. Queda pegado en la alcancía y lo ajustas con la barra que aparece debajo del visor.',
+  '#tab-imagenes': 'Sube tu propia imagen o usa un escudo. Pasa el cursor por la alcancía para ver dónde queda y haz clic para pegarla.',
+  '#tamanos [data-t=s]': 'Alcancía pequeña: 14 × 10 cm.', '#tamanos [data-t=m]': 'Alcancía mediana: 16 × 13 cm.', '#tamanos [data-t=l]': 'Alcancía grande: 18 × 15 cm.',
+  '#partes [data-p=todo]': 'El color que elijas se aplica a todas las partes a la vez.',
+  '#partes [data-p=cuerpo]': 'Pinta el cuerpo, que es la parte grande y redonda.',
+  '#partes [data-p=nariz]': 'Pinta solo la nariz (el disco del hocico).',
+  '#partes [data-p=orejas]': 'Pinta las dos orejas juntas.',
+  '#partes [data-p=cola]': 'Pinta la colita.',
+  '#color-libre': 'Elige cualquier color que no esté en la paleta.',
+  '#acabados [data-a=liso]': 'Un solo color, sin dibujos.',
+  '#acabados [data-a=lunares]': 'Agrega lunares repartidos por el cuerpo.',
+  '#acabados [data-a=rayas]': 'Agrega rayas verticales al cuerpo.',
+  '#acabados [data-a=corazones]': 'Agrega corazones repartidos por el cuerpo.',
+  '#color-patron': 'Color de los lunares, rayas o corazones.',
+  '#btn-texto': 'Agrega un texto a la alcancía. Después cambias las letras, el tipo de letra y el color en la barra de abajo.',
+  '#lbl-archivo': 'Sube una foto o dibujo desde tu computador. Si tiene fondo transparente (PNG), se ve mejor.',
+  '#btn-cancelar-img': 'Deja de colocar la imagen sin pegarla (también sirve la tecla Esc).',
+  '#btn-guardar': 'Descarga un archivo con tu diseño para retomarlo después.',
+  '#btn-foto': 'Guarda una foto (PNG) de tu alcancía tal como la ves ahora.',
+  '#in-texto': 'Escribe el texto que irá en la alcancía (hasta 18 letras).',
+  '#in-fuente': 'Cambia el tipo de letra.',
+  '#in-color': 'Cambia el color de este detalle.',
+  '#in-borde': 'Agrega un borde más oscuro alrededor de las letras o del ícono.',
+  '#btn-espejo': 'Copia este detalle en espejo, en el otro lado de la alcancía.',
+  '#btn-borrar': 'Quita este detalle de la alcancía.',
+  '#in-tam': 'Hace el detalle más grande o más pequeño.',
+  '#in-rot': 'Lo inclina hacia la izquierda o hacia la derecha.',
+  '#in-h': 'Lo mueve alrededor del cuerpo, de la nariz hacia la cola.',
+  '#in-v': 'Lo sube o lo baja en el cuerpo.',
+};
+Object.entries(AYUDAS).forEach(([sel, texto]) => $$(sel).forEach(el => { el.dataset.ayuda = texto; }));
+const AYUDA_TITULOS = {
+  'Colores': 'Paso 1: elige la parte (Todo, Cuerpo, Nariz, Orejas o Cola). Paso 2: toca un color de la paleta, o crea uno con «Otro color».',
+  'Acabado del cuerpo': 'Liso deja un solo color. Lunares, Rayas y Corazones dibujan un patrón sobre el cuerpo; su color se cambia abajo, en «Color del dibujo».',
+  'Tus imágenes': 'Sube una imagen y pasa el cursor por la alcancía: ahí aparece. Rueda del ratón = tamaño. Flechas ← → = inclinar (con Shift, más fino). Clic = pegar. Esc = cancelar.',
+  'Escudos de equipos': 'Escudos listos para usar. Toca uno y colócalo igual que una imagen: cursor sobre la alcancía, rueda para el tamaño, flechas para inclinar y clic para pegar.',
+};
+$$('.paneles h3').forEach(h => {
+  const t = AYUDA_TITULOS[h.textContent.trim()]; if (!t) return;
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'pista'; b.textContent = '?';
+  b.dataset.ayuda = t; b.setAttribute('aria-label', 'Cómo se usa: ' + h.textContent.trim()); h.appendChild(b);
+});
+{
+  const iconos = $('#iconos'); if (iconos) iconos.dataset.ayuda = 'Toca un ícono para pegarlo en la alcancía. Luego lo ajustas con la barra de abajo o tocando otro punto del cuerpo.';
+  const etq = $('#p-detalles .etiqueta'); // «O elige un ícono»
+  if (etq) { const b = document.createElement('button'); b.type = 'button'; b.className = 'pista'; b.textContent = '?';
+    b.dataset.ayuda = 'Toca un ícono para pegarlo en la alcancía. Luego lo ajustas con la barra que aparece debajo del visor, o tocando otro punto del cuerpo para moverlo.';
+    b.setAttribute('aria-label', 'Cómo se usan los íconos'); etq.appendChild(b); }
+  const lista = $('#vacio'); if (lista) lista.dataset.ayuda = 'Aquí aparecen los textos e íconos que vas agregando. Toca uno para elegirlo y editarlo.';
+}
+const tip = document.createElement('div'); tip.id = 'tip'; tip.setAttribute('role', 'tooltip'); document.body.appendChild(tip);
+let tipEl = null, tipTimer = null;
+function ponerTip(el) {
+  tip.textContent = el.dataset.ayuda; tipEl = el; el.setAttribute('aria-describedby', 'tip');
+  tip.style.left = '0px'; tip.style.top = '0px'; tip.classList.remove('arriba');
+  const r = el.getBoundingClientRect(), t = tip.getBoundingClientRect(), m = 10;
+  let x = Math.min(innerWidth - t.width - m, Math.max(m, r.left + r.width / 2 - t.width / 2));
+  let y = r.bottom + 10, arriba = false;
+  if (y + t.height > innerHeight - m && r.top - t.height - 10 > m) { y = r.top - t.height - 10; arriba = true; }
+  tip.style.left = x + 'px'; tip.style.top = y + 'px'; tip.classList.toggle('arriba', arriba);
+  tip.style.setProperty('--flecha', Math.min(t.width - 14, Math.max(14, r.left + r.width / 2 - x)) + 'px');
+  tip.classList.add('ver');
+}
+function quitarTip() {
+  clearTimeout(tipTimer); tip.classList.remove('ver');
+  if (tipEl) { tipEl.removeAttribute('aria-describedby'); tipEl = null; }
+}
+document.addEventListener('mouseover', e => {
+  const el = e.target.closest('[data-ayuda]'); if (!el || el === tipEl) return;
+  clearTimeout(tipTimer); tipTimer = setTimeout(() => ponerTip(el), 350);
+});
+document.addEventListener('mouseout', e => { const el = e.target.closest('[data-ayuda]'); if (el && !el.contains(e.relatedTarget)) quitarTip(); });
+document.addEventListener('focusin', e => { const el = e.target.closest('[data-ayuda]'); if (el && e.target.matches(':focus-visible')) ponerTip(el); });
+document.addEventListener('focusout', quitarTip);
+document.addEventListener('click', e => { const el = e.target.closest('.pista'); if (el) { tipEl === el ? quitarTip() : ponerTip(el); } else quitarTip(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') quitarTip(); });
+window.addEventListener('scroll', quitarTip, true);
 
 /* ================= decoración del escenario (línea de arte, como el sello) ================= */
 (function ruedo() {
