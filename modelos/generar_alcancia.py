@@ -1,4 +1,4 @@
-"""Alcancía base (cerdito de barro) para un simulador web de personalización.
+r"""Alcancía base (cerdito de barro) para un simulador web de personalización.
 
 Se ejecuta DENTRO de Blender (MCP o pestaña Scripting):
     exec(open(r"C:\Users\jo\Desktop\JP\ALCANCIAPP\modelos\generar_alcancia.py", encoding="utf-8").read())
@@ -19,7 +19,7 @@ from mathutils import Euler, Matrix, Vector
 from mathutils.kdtree import KDTree
 
 SALIDA = r"C:\Users\jo\Desktop\JP\ALCANCIAPP\modelos"
-TAMANOS = {"s": (14, 10), "m": (16, 13), "l": (18, 15)}
+TAMANOS = {"s": (14, 11.4), "m": (16, 13), "l": (18, 15)}   # largo y alto en cm; la pequeña se sube de 10 a 11,4 de alto para que no se vea achatada
 COLOR_BARRO = (0.62, 0.27, 0.13, 1.0)
 
 
@@ -474,8 +474,8 @@ def exportar(sufijo):
             o.select_set(True)
     bpy.ops.export_scene.gltf(filepath=ruta, export_format="GLB", use_selection=True,
                               export_apply=True, export_yup=True)
-    # plantillas UV, una por pieza
-    for o in [o for o in bpy.data.objects if o.type == "MESH"]:
+    # plantillas UV, una por pieza (solo con la ventana de Blender abierta)
+    for o in ([] if bpy.app.background else [o for o in bpy.data.objects if o.type == "MESH"]):
         bpy.ops.object.select_all(action="DESELECT")
         o.select_set(True)
         bpy.context.view_layer.objects.active = o
@@ -489,7 +489,10 @@ def exportar(sufijo):
 
 def todo():
     os.makedirs(SALIDA, exist_ok=True)
+    solo = os.environ.get("ALCANCIA_SOLO")      # p. ej. «s» para regenerar solo la pequeña (modo sin ventana)
     for sufijo, (a, b) in TAMANOS.items():
+        if solo and sufijo not in solo.split(","):
+            continue
         generar(a, b)
         print(sufijo, exportar(sufijo), os.path.getsize(os.path.join(SALIDA, "alcancia_%s.glb" % sufijo)), "bytes")
     generar(*TAMANOS["m"])  # deja el mediano en la escena

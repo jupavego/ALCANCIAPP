@@ -627,7 +627,7 @@ let pulso = null; // {id, hasta}
 /* ---- nariz: zona del hocico en el mapa UV, sacada de la malla (lo que sobresale del óvalo del cuerpo) ---- */
 const narizTmp = document.createElement('canvas'); narizTmp.width = W; narizTmp.height = H;
 const narizC = narizTmp.getContext('2d');
-const MEDIDAS = { s: [14, 10], m: [16, 13], l: [18, 15] };   // largo y alto en cm
+const MEDIDAS = { s: [14, 11.4], m: [16, 13], l: [18, 15] };   // largo y alto en cm
 const mascaras = {};
 function mascaraNariz(t) {
   if (mascaras[t] !== undefined) return mascaras[t];
@@ -772,7 +772,7 @@ const promesas = Object.keys(GLB).map(k => new Promise((ok, mal) => {
   }, mal);
 }));
 
-const ALTO = { s: 0.10, m: 0.123, l: 0.15 };
+const ALTO = { s: 0.113, m: 0.123, l: 0.15 };
 let encuadrado = false;
 function ponerTamano(t, forzar = false) {
   estado.tam = t;
