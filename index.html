@@ -233,6 +233,52 @@ main{align-items:stretch}
 #tip.ver{opacity:1;transform:none}
 #tip::before{content:"";position:absolute;left:var(--flecha,50%);top:-6px;width:10px;height:10px;background:var(--linea);transform:translateX(-50%) rotate(45deg)}
 #tip.arriba::before{top:auto;bottom:-6px}
+
+/* ---------- celular y tableta ---------- */
+.barra-tactil{position:absolute;left:50%;bottom:54px;transform:translateX(-50%);display:flex;gap:4px;padding:5px;
+  background:rgba(255,250,242,.96);border:2px solid var(--linea);border-radius:999px;box-shadow:var(--sombra);z-index:3;max-width:96%}
+.barra-tactil button{min-width:40px;height:42px;border-radius:999px;border:2px solid var(--linea-suave);background:#fff;font:700 20px/1 'Nunito',sans-serif;color:var(--linea);padding:0 8px}
+.barra-tactil button.pegar{background:var(--rosa);border-color:var(--linea);font-size:14px;padding:0 12px}
+.barra-tactil button:active{background:var(--rosa-2)}
+.sr,.menu a span.sr-solo{position:absolute;left:-9999px}
+@media (pointer:coarse){
+  .chip,.btn{min-height:42px}
+  .chip.tam{min-height:46px}
+  input[type=range]{height:34px}
+  input[type=color]{width:48px;height:40px}
+  .muestra{min-height:38px}
+  .pestanas button{min-height:46px}
+  .pista{width:28px;height:28px;font-size:14px}
+}
+@media (max-width:900px){
+  main{gap:12px}
+  .col-visor{display:contents}                   /* el visor y la barra de edición pasan a ser hijos directos de main */
+  .col-visor .escenario{position:sticky;top:8px;z-index:6;flex:none;height:46vh;height:46dvh;min-height:300px;max-height:560px}
+  .editor{order:0}
+  .caja{height:auto}
+  .paneles{overflow:visible}
+}
+@media (max-width:600px){
+  .cabecera{flex-wrap:nowrap;gap:8px;padding:8px 12px}
+  .marca{gap:8px;min-width:0}
+  .marca .sello-img{width:54px;height:54px}
+  .marca b{font-size:26px}
+  .marca small{display:none}
+  .menu{margin-left:auto;flex-wrap:nowrap;gap:0}
+  .menu a{padding:4px;border-radius:14px}
+  .menu a span{position:absolute;left:-9999px}
+  .menu img{width:40px;height:40px}
+  .portada{padding:0 12px 6px}
+  .portada h1{font-size:26px}
+  .portada p{font-size:13px}
+  .etiquetas{display:none!important}
+  .escenario .ayuda{font-size:11.5px;bottom:8px;padding:5px 10px}
+  .barra-acciones{right:8px;top:8px}
+  .barra-acciones .btn{padding:4px 10px;font-size:13px;min-height:36px}
+  .seccion{padding:0 12px 18px}
+  .tarjeta.ancha{padding:16px}
+  .ed-fila strong{min-width:0}
+}
 footer{text-align:center;color:var(--linea-suave);font-size:13px;padding:0 16px 26px}
 footer b{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--linea)}
 .sr{position:absolute;left:-9999px}
@@ -267,6 +313,14 @@ footer b{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--linea
     <canvas id="escena"></canvas>
     <div class="ayuda" id="ayuda">Arrastra para girar · rueda para acercar · toca la alcancía para mover el detalle elegido</div>
     <div class="nube" id="nube">Preparando tu alcancía…</div>
+    <div class="barra-tactil" id="barra-tactil" hidden role="group" aria-label="Colocar la imagen">
+      <button type="button" id="t-menos" aria-label="Más pequeña">−</button>
+      <button type="button" id="t-mas" aria-label="Más grande">+</button>
+      <button type="button" id="t-izq" aria-label="Inclinar a la izquierda">↺</button>
+      <button type="button" id="t-der" aria-label="Inclinar a la derecha">↻</button>
+      <button type="button" id="t-pegar" class="pegar">Pegar</button>
+      <button type="button" id="t-cancelar" aria-label="Cancelar">✕</button>
+    </div>
     <div class="barra-acciones">
       <button class="btn" id="btn-guardar" title="Descarga tu diseño para retomarlo o enviarlo">Guardar diseño</button>
       <button class="btn primario" id="btn-foto">Descargar foto</button>
@@ -677,7 +731,7 @@ function ponerTamano(t) {
   Object.entries(modelos).forEach(([k, g]) => g.visible = k === t);
   const h = ALTO[t];
   controls.target.set(0, h * 0.46, 0);
-  const d = camera.position.clone().sub(controls.target); const dist = h * 2.75 * Math.max(1, 0.95 / camera.aspect);   // en pantallas altas hay que alejar más
+  const d = camera.position.clone().sub(controls.target); const dist = h * 2.75 * Math.max(1.1, 1.0 / camera.aspect);   // en pantallas altas hay que alejar más
   d.setLength(dist); camera.position.copy(controls.target).add(d);
   $$('#tamanos .chip').forEach(b => b.setAttribute('aria-pressed', b.dataset.t === t));
   if (typeof pintarLienzo === 'function' && cuerposPorTam[t]) pintarLienzo();
@@ -703,6 +757,12 @@ let ultimoGiro = 0;
 /* el cursor sobre la alcancía: vista previa de la imagen y colocación */
 const rayo = new THREE.Raycaster(), p = new THREE.Vector2(); let abajo = null;
 const limitar = (x, a, b) => Math.min(b, Math.max(a, x));
+function golpeNDC(nx, ny) {
+  p.set(nx, ny); rayo.setFromCamera(p, camera);
+  const vis = cuerpos.filter(m => { let o = m; while (o) { if (!o.visible) return false; o = o.parent; } return true; });
+  const hit = rayo.intersectObjects(vis, false)[0];
+  return hit && hit.uv ? { u: limitar(1 - hit.uv.x, .001, .999), v: limitar(hit.uv.y, .12, .88) } : null;
+}
 function golpeCuerpo(e) {
   const r = cv.getBoundingClientRect(); p.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
   rayo.setFromCamera(p, camera);
@@ -712,7 +772,7 @@ function golpeCuerpo(e) {
 }
 cv.addEventListener('pointerdown', e => { abajo = { x: e.clientX, y: e.clientY }; });
 cv.addEventListener('pointermove', e => {
-  if (!fantasma.activo) return;
+  if (!fantasma.activo || e.pointerType === 'touch') return;     // con el dedo no hay «pasar el cursor»
   const q = e.buttons ? null : golpeCuerpo(e);      // si arrastra, está girando la vista: sin vista previa
   fantasma.visible = !!q; if (q) { fantasma.u = q.u; fantasma.v = q.v; }
   controls.enableZoom = !q; cv.style.cursor = q ? 'crosshair' : '';
@@ -733,7 +793,11 @@ window.addEventListener('keydown', e => {
 cv.addEventListener('pointerup', e => {
   if (!abajo || Math.hypot(e.clientX - abajo.x, e.clientY - abajo.y) > 5) { abajo = null; return; } abajo = null;
   const q = golpeCuerpo(e); if (!q) return;
-  if (fantasma.activo) { colocarImagen(q); return; }
+  if (fantasma.activo) {
+    if (e.pointerType === 'touch') { fantasma.u = q.u; fantasma.v = q.v; fantasma.visible = true; pedirComponer(); }   // el dedo solo mueve; se pega con «Pegar»
+    else colocarImagen(q);
+    return;
+  }
   const d = detalleSel(); if (!d) return;
   d.u = q.u; d.v = q.v; sincronizarControles(); pintarLienzo();
 });
@@ -844,6 +908,8 @@ $('#btn-borrar').addEventListener('click', () => { estado.detalles = estado.deta
 $('#btn-espejo').addEventListener('click', () => { const d = detalleSel(); if (!d) return; agregar({ ...d, id: undefined, u: 1 - d.u, rot: -d.rot }); });
 
 /* imágenes del cliente */
+const TACTIL = matchMedia('(pointer: coarse)').matches;
+if (TACTIL) $('#ayuda').textContent = 'Arrastra con un dedo para girar · pellizca para acercar · toca la alcancía para mover el detalle elegido';
 const AYUDA_NORMAL = $('#ayuda').textContent;
 function actualizarGuia() { $('#g-tam').textContent = Math.round(fantasma.tam * 100) + ' %'; $('#g-rot').textContent = Math.round(fantasma.rot) + '°'; }
 function empezarImagen(id) {
@@ -852,12 +918,20 @@ function empezarImagen(id) {
   $('#guia-img').hidden = false; actualizarGuia();
   $$('#biblio button').forEach(b => b.setAttribute('aria-pressed', b.dataset.id === id));
   $$('#escudos button').forEach(b => b.setAttribute('aria-pressed', 'esc-' + b.dataset.id === id));
-  $('#ayuda').textContent = 'Mueve el cursor sobre la alcancía · rueda: tamaño · ← →: inclinar · clic: pegar · Esc: cancelar';
+  if (TACTIL) {
+    const q = golpeNDC(0, 0) || { u: .27, v: .5 };                  // aparece en el centro de lo que se ve
+    fantasma.u = q.u; fantasma.v = limitar(q.v, .38, .62); fantasma.visible = true;   // en el flanco, lejos de los polos
+    $('#barra-tactil').hidden = false;
+    $('#guia-img small').textContent = 'Toca la alcancía para mover la imagen. Con − + cambias el tamaño, con ↺ ↻ la inclinas y con «Pegar» la dejas ahí.';
+    $('#ayuda').textContent = 'Toca la alcancía para mover la imagen · ajusta con los botones · «Pegar» para dejarla';
+  } else {
+    $('#ayuda').textContent = 'Mueve el cursor sobre la alcancía · rueda: tamaño · ← →: inclinar · clic: pegar · Esc: cancelar';
+  }
   componer();
 }
 function cancelarImagen() {
   fantasma.activo = false; fantasma.visible = false; controls.enableZoom = true; cv.style.cursor = '';
-  $('#guia-img').hidden = true; $('#ayuda').textContent = AYUDA_NORMAL;
+  $('#guia-img').hidden = true; $('#barra-tactil').hidden = true; $('#ayuda').textContent = AYUDA_NORMAL;
   $$('#biblio button, #escudos button').forEach(b => b.setAttribute('aria-pressed', 'false')); componer();
 }
 function colocarImagen(q) {
@@ -865,6 +939,12 @@ function colocarImagen(q) {
   cancelarImagen(); agregar({ tipo: 'imagen', imagen: id, u: q.u, v: q.v, tam, rot, borde: false });
 }
 $('#btn-cancelar-img').addEventListener('click', cancelarImagen);
+$('#t-mas').addEventListener('click', () => { fantasma.tam = limitar(fantasma.tam * 1.12, .15, 4); actualizarGuia(); componer(); });
+$('#t-menos').addEventListener('click', () => { fantasma.tam = limitar(fantasma.tam / 1.12, .15, 4); actualizarGuia(); componer(); });
+$('#t-izq').addEventListener('click', () => { fantasma.rot = ((fantasma.rot - 5 + 540) % 360) - 180; actualizarGuia(); componer(); });
+$('#t-der').addEventListener('click', () => { fantasma.rot = ((fantasma.rot + 5 + 540) % 360) - 180; actualizarGuia(); componer(); });
+$('#t-pegar').addEventListener('click', () => colocarImagen({ u: fantasma.u, v: fantasma.v }));
+$('#t-cancelar').addEventListener('click', cancelarImagen);
 $('#lbl-archivo').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('#in-archivo').click(); } });
 $('#in-archivo').addEventListener('change', e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
