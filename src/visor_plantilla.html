@@ -304,6 +304,7 @@ main{align-items:stretch}
   .modelo h3{font-size:19px}
   .modelo .btn{padding:6px 10px;font-size:13px}
 }
+.grupo{font:700 15px 'Nunito',sans-serif;color:var(--linea);margin:14px 0 6px}
 footer{text-align:center;color:var(--linea-suave);font-size:13px;padding:0 16px 26px}
 footer b{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--linea)}
 .sr{position:absolute;left:-9999px}
@@ -371,6 +372,7 @@ footer b{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--linea
         <div class="ed-color" id="fila-color"><span class="etiqueta sr">Color</span><input type="color" id="in-color" aria-label="Color del detalle"></div>
         <button class="chip" id="in-borde" aria-pressed="true">Con contorno</button>
         <span class="espacio"></span>
+        <button class="btn mini primario" id="btn-pegar-ed" hidden>Pegar aquí</button>
         <button class="btn mini" id="btn-espejo" title="Copiar al otro lado de la alcancía">Al otro lado</button>
         <button class="btn mini" id="btn-borrar">Quitar</button>
       </div>
@@ -449,6 +451,8 @@ footer b{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--linea
           <div class="biblio" id="biblio"></div>
           <h3>Escudos de equipos</h3>
           <div class="escudos" id="escudos" role="group" aria-label="Escudos de equipos"></div>
+          <h3>Personajes e ilustraciones</h3>
+          <div id="listas"><p class="vacio" id="vacio-listas">Se cargan al abrir esta pestaña…</p></div>
         </div>
       </div>
       <div class="pie-panel">
@@ -713,7 +717,7 @@ function dibujarEnLienzo(c, d, base) {
   for (const dx of [-W, 0, W]) dibujarDetalle(c, d, base, (1 - d.u) * W + dx, d.v * H, fx, true);
 }
 /* la imagen que se está colocando: solo se ve mientras el cursor está sobre la alcancía */
-const fantasma = { activo: false, visible: false, imagen: null, u: .3, v: .5, tam: 1, rot: 0 };
+const fantasma = { id: -1, tipo: 'imagen', borde: false, activo: false, visible: false, fijo: false, imagen: null, u: .3, v: .5, tam: 1, rot: 0 };
 function componer() {
   ctx.clearRect(0, 0, W, H); ctx.drawImage(baseC, 0, 0);
   if (fantasma.activo && fantasma.visible) {
@@ -754,6 +758,7 @@ const matOrejas = new THREE.MeshStandardMaterial({ color: linear(BARRO), roughne
 const matCola = new THREE.MeshStandardMaterial({ color: linear(BARRO), roughness: .85, metalness: 0 });
 const MAT = { cuerpo: matCuerpo, oreja_izq: matOrejas, oreja_der: matOrejas, cola: matCola };
 
+const ESCALA_MODELO = 1.1;   // los modelos 3D salen ~10 % más chicos que la medida del catálogo (14×10, 16×13, 18×15 cm): se ajustan aquí
 const modelos = {};  // s, m, l
 let cuerpos = [];    // mallas "cuerpo" de cada tamaño (para tocar y colocar)
 const cuerposPorTam = {};
@@ -763,18 +768,25 @@ const promesas = Object.keys(GLB).map(k => new Promise((ok, mal) => {
   cargador.parse(aBuffer(GLB[k]), '', gltf => {
     const g = gltf.scene;
     g.traverse(o => { if (o.isMesh) { o.material = MAT[o.name] || matCuerpo; o.castShadow = true; o.receiveShadow = true; if (o.name === 'cuerpo') { o.userData.cuerpo = true; cuerpos.push(o); cuerposPorTam[k] = o; } } });
-    g.visible = false; scene.add(g); modelos[k] = g; ok();
+    g.scale.setScalar(ESCALA_MODELO); g.visible = false; scene.add(g); modelos[k] = g; ok();
   }, mal);
 }));
 
 const ALTO = { s: 0.10, m: 0.123, l: 0.15 };
-function ponerTamano(t) {
+let encuadrado = false;
+function ponerTamano(t, forzar = false) {
   estado.tam = t;
   Object.entries(modelos).forEach(([k, g]) => g.visible = k === t);
-  const h = ALTO[t];
-  controls.target.set(0, h * 0.46, 0);
-  const d = camera.position.clone().sub(controls.target); const dist = h * 2.75 * Math.max(1.1, 1.0 / camera.aspect);   // en pantallas altas hay que alejar más
-  d.setLength(dist); camera.position.copy(controls.target).add(d);
+  const h = ALTO[t], nuevo = new THREE.Vector3(0, h * 0.46, 0);
+  if (forzar || !encuadrado) {
+    // la distancia de la cámara se fija con la alcancía mediana: así la pequeña se ve más pequeña y la grande más grande
+    controls.target.copy(nuevo);
+    const d = camera.position.clone().sub(controls.target); const dist = ALTO.m * 2.75 * ESCALA_MODELO * Math.max(1.1, 1.0 / camera.aspect);
+    d.setLength(dist); camera.position.copy(controls.target).add(d);
+    encuadrado = true;
+  } else {
+    camera.position.add(nuevo.clone().sub(controls.target)); controls.target.copy(nuevo);   // misma distancia y mismo ángulo
+  }
   $$('#tamanos .chip').forEach(b => b.setAttribute('aria-pressed', b.dataset.t === t));
   if (typeof pintarLienzo === 'function' && cuerposPorTam[t]) pintarLienzo();
 }
@@ -791,7 +803,7 @@ let ultimoGiro = 0;
 ['pointerdown', 'wheel'].forEach(e => cv.addEventListener(e, () => { controls.autoRotate = false; ultimoGiro = performance.now(); }, { passive: true }));
 (function bucle() {
   requestAnimationFrame(bucle);
-  if (!controls.autoRotate && ultimoGiro && performance.now() - ultimoGiro > 9000) { controls.autoRotate = true; ultimoGiro = 0; }
+  if (!controls.autoRotate && ultimoGiro && performance.now() - ultimoGiro > 9000 && !fantasma.activo && estado.sel === null) { controls.autoRotate = true; ultimoGiro = 0; }   // no gira mientras se edita algo
   if (pulso) { if (performance.now() > pulso.hasta) { pulso = null; } pintarLienzo(); }
   controls.update(); renderer.render(scene, camera);
 })();
@@ -816,27 +828,27 @@ cv.addEventListener('pointerdown', e => { abajo = { x: e.clientX, y: e.clientY }
 cv.addEventListener('pointermove', e => {
   if (!fantasma.activo || e.pointerType === 'touch') return;     // con el dedo no hay «pasar el cursor»
   const q = e.buttons ? null : golpeCuerpo(e);      // si arrastra, está girando la vista: sin vista previa
-  fantasma.visible = !!q; if (q) { fantasma.u = q.u; fantasma.v = q.v; }
+  fantasma.visible = !!q || fantasma.fijo; if (q) { fantasma.u = q.u; fantasma.v = q.v; fantasma.fijo = false; sincronizarControles(); }
   controls.enableZoom = !q; cv.style.cursor = q ? 'crosshair' : '';
   pedirComponer();
 });
-cv.addEventListener('pointerleave', () => { if (fantasma.activo) { fantasma.visible = false; controls.enableZoom = true; componer(); } });
+cv.addEventListener('pointerleave', () => { if (fantasma.activo) { fantasma.visible = fantasma.fijo; controls.enableZoom = true; componer(); } });
 cv.addEventListener('wheel', e => {
   if (!(fantasma.activo && fantasma.visible)) return;
-  e.preventDefault(); fantasma.tam = limitar(fantasma.tam * (e.deltaY < 0 ? 1.08 : 1 / 1.08), .15, 4); pedirComponer(); actualizarGuia();
+  e.preventDefault(); fantasma.tam = limitar(fantasma.tam * (e.deltaY < 0 ? 1.08 : 1 / 1.08), .15, 4); pedirComponer(); actualizarGuia(); sincronizarControles();
 }, { passive: false });
 window.addEventListener('keydown', e => {
   if (!fantasma.activo) return;
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
     e.preventDefault(); fantasma.rot += (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 1 : 4);
-    fantasma.rot = ((fantasma.rot + 540) % 360) - 180; pedirComponer(); actualizarGuia();
+    fantasma.rot = ((fantasma.rot + 540) % 360) - 180; pedirComponer(); actualizarGuia(); sincronizarControles();
   } else if (e.key === 'Escape') cancelarImagen();
 });
 cv.addEventListener('pointerup', e => {
   if (!abajo || Math.hypot(e.clientX - abajo.x, e.clientY - abajo.y) > 5) { abajo = null; return; } abajo = null;
   const q = golpeCuerpo(e); if (!q) return;
   if (fantasma.activo) {
-    if (e.pointerType === 'touch') { fantasma.u = q.u; fantasma.v = q.v; fantasma.visible = true; pedirComponer(); }   // el dedo solo mueve; se pega con «Pegar»
+    if (e.pointerType === 'touch') { fantasma.u = q.u; fantasma.v = q.v; fantasma.visible = true; fantasma.fijo = true; pedirComponer(); sincronizarControles(); }   // el dedo solo mueve; se pega con «Pegar»
     else colocarImagen(q);
     return;
   }
@@ -845,7 +857,9 @@ cv.addEventListener('pointerup', e => {
 });
 
 /* pestañas del panel */
+let listasPedidas = false;
 function irAPestana(id) {
+  if (id === 'imagenes' && !listasPedidas) { listasPedidas = true; construirListas(); }
   $$('.pestanas [role=tab]').forEach(b => b.setAttribute('aria-selected', b.id === 'tab-' + id));
   $$('.paneles [role=tabpanel]').forEach(pn => pn.hidden = pn.id !== 'p-' + id);
 }
@@ -919,7 +933,7 @@ function agregar(base) {
   estado.detalles.push(d); estado.sel = d.id; pulso = { id: d.id, hasta: performance.now() + 1400 };
   pintarLienzo(); refrescarLista(); controls.autoRotate = false;
 }
-const detalleSel = () => estado.detalles.find(d => d.id === estado.sel);
+const detalleSel = () => (fantasma.activo ? fantasma : estado.detalles.find(d => d.id === estado.sel));   // con una imagen en vista previa, la barra edita esa imagen
 function refrescarLista() {
   const lista = $('#lista'); lista.innerHTML = '';
   estado.detalles.forEach(d => {
@@ -935,20 +949,24 @@ function refrescarLista() {
 }
 function sincronizarControles() {
   const d = detalleSel(); if (!d) return;
-  $('#ed-titulo').textContent = d.tipo === 'texto' ? 'Texto' : d.tipo === 'imagen' ? 'Imagen' : NOMBRES[d.icono];
+  const vista = d === fantasma;
+  $('#ed-titulo').textContent = (d.tipo === 'texto' ? 'Texto' : d.tipo === 'imagen' ? 'Imagen' : NOMBRES[d.icono]) + (vista ? ' · vista previa' : '');
+  $('#btn-pegar-ed').hidden = !vista; $('#btn-espejo').hidden = vista; $('#btn-borrar').textContent = vista ? 'Cancelar' : 'Quitar';
   $('#in-texto').value = d.texto; $('#in-fuente').value = d.fuente; if (d.color) $('#in-color').value = d.color;
   $('#fila-color').hidden = d.tipo === 'imagen'; $('#in-borde').hidden = d.tipo === 'imagen';
   $('#in-tam').value = d.tam; $('#in-rot').value = d.rot; $('#in-h').value = d.u; $('#in-v').value = d.v;
   $('#in-borde').setAttribute('aria-pressed', d.borde);
 }
 function enlazar(id, campo, conv = v => v, refrescarTodo = false) {
-  $(id).addEventListener('input', e => { const d = detalleSel(); if (!d) return; guardarPaso('ed-' + campo + d.id); d[campo] = conv(e.target.value); pintarLienzo(); if (refrescarTodo) refrescarLista(); });
+  $(id).addEventListener('input', e => { const d = detalleSel(); if (!d) return; if (d !== fantasma) guardarPaso('ed-' + campo + d.id); d[campo] = conv(e.target.value);
+    if (d === fantasma) { fantasma.fijo = true; fantasma.visible = true; }   // moviendo los deslizadores la imagen se queda a la vista
+    pintarLienzo(); if (refrescarTodo) refrescarLista(); });
 }
 enlazar('#in-texto', 'texto', v => v || ' ', true); enlazar('#in-fuente', 'fuente', v => v, true); enlazar('#in-color', 'color', v => v, true);
 enlazar('#in-tam', 'tam', Number); enlazar('#in-rot', 'rot', Number); enlazar('#in-h', 'u', Number); enlazar('#in-v', 'v', Number);
 $('#in-borde').addEventListener('click', () => { const d = detalleSel(); if (!d) return; guardarPaso(); d.borde = !d.borde; sincronizarControles(); pintarLienzo(); refrescarLista(); });
 $('#btn-texto').addEventListener('click', () => agregar({ tipo: 'texto', color: '#7a5244' }));
-$('#btn-borrar').addEventListener('click', () => { guardarPaso(); estado.detalles = estado.detalles.filter(d => d.id !== estado.sel); estado.sel = estado.detalles.length ? estado.detalles[estado.detalles.length - 1].id : null; pintarLienzo(); refrescarLista(); });
+$('#btn-borrar').addEventListener('click', () => { if (fantasma.activo) { cancelarImagen(); return; } guardarPaso(); estado.detalles = estado.detalles.filter(d => d.id !== estado.sel); estado.sel = estado.detalles.length ? estado.detalles[estado.detalles.length - 1].id : null; pintarLienzo(); refrescarLista(); });
 $('#btn-espejo').addEventListener('click', () => { const d = detalleSel(); if (!d) return; agregar({ ...d, id: undefined, u: 1 - d.u, rot: -d.rot }); });
 
 /* imágenes del cliente */
@@ -957,32 +975,35 @@ if (TACTIL) $('#ayuda').textContent = 'Arrastra con un dedo para girar · pelliz
 const AYUDA_NORMAL = $('#ayuda').textContent;
 function actualizarGuia() { $('#g-tam').textContent = Math.round(fantasma.tam * 100) + ' %'; $('#g-rot').textContent = Math.round(fantasma.rot) + '°'; }
 function empezarImagen(id) {
-  Object.assign(fantasma, { activo: true, visible: false, imagen: id, tam: 1, rot: 0 });
+  Object.assign(fantasma, { activo: true, visible: false, fijo: false, imagen: id, tam: 1, rot: 0 });
   controls.autoRotate = false; ultimoGiro = performance.now();
   $('#guia-img').hidden = false; actualizarGuia();
   $$('#biblio button').forEach(b => b.setAttribute('aria-pressed', b.dataset.id === id));
   $$('#escudos button').forEach(b => b.setAttribute('aria-pressed', 'esc-' + b.dataset.id === id));
+  $$('#listas button').forEach(b => b.setAttribute('aria-pressed', 'lst-' + b.dataset.id === id));
   if (TACTIL) {
     const q = golpeNDC(0, 0) || { u: .27, v: .5 };                  // aparece en el centro de lo que se ve
-    fantasma.u = q.u; fantasma.v = limitar(q.v, .38, .62); fantasma.visible = true;   // en el flanco, lejos de los polos
+    fantasma.u = q.u; fantasma.v = limitar(q.v, .38, .62); fantasma.visible = true; fantasma.fijo = true;   // en el flanco, lejos de los polos
     $('#barra-tactil').hidden = false;
     $('#guia-img small').textContent = 'Toca la alcancía para mover la imagen. Con − + cambias el tamaño, con ↺ ↻ la inclinas y con «Pegar» la dejas ahí.';
     $('#ayuda').textContent = 'Toca la alcancía para mover la imagen · ajusta con los botones · «Pegar» para dejarla';
   } else {
     $('#ayuda').textContent = 'Mueve el cursor sobre la alcancía · rueda: tamaño · ← →: inclinar · clic: pegar · Esc: cancelar';
   }
-  componer();
+  refrescarLista(); componer();
 }
 function cancelarImagen() {
   fantasma.activo = false; fantasma.visible = false; controls.enableZoom = true; cv.style.cursor = '';
   $('#guia-img').hidden = true; $('#barra-tactil').hidden = true; $('#ayuda').textContent = AYUDA_NORMAL;
-  $$('#biblio button, #escudos button').forEach(b => b.setAttribute('aria-pressed', 'false')); componer();
+  $$('#biblio button, #escudos button, #listas button').forEach(b => b.setAttribute('aria-pressed', 'false'));
+  fantasma.fijo = false; refrescarLista(); componer();
 }
 function colocarImagen(q) {
   const id = fantasma.imagen, tam = fantasma.tam, rot = fantasma.rot;
   cancelarImagen(); agregar({ tipo: 'imagen', imagen: id, u: q.u, v: q.v, tam, rot, borde: false });
 }
 $('#btn-cancelar-img').addEventListener('click', cancelarImagen);
+$('#btn-pegar-ed').addEventListener('click', () => colocarImagen({ u: fantasma.u, v: fantasma.v }));
 $('#t-mas').addEventListener('click', () => { fantasma.tam = limitar(fantasma.tam * 1.12, .15, 4); actualizarGuia(); componer(); });
 $('#t-menos').addEventListener('click', () => { fantasma.tam = limitar(fantasma.tam / 1.12, .15, 4); actualizarGuia(); componer(); });
 $('#t-izq').addEventListener('click', () => { fantasma.rot = ((fantasma.rot - 5 + 540) % 360) - 180; actualizarGuia(); componer(); });
@@ -1031,6 +1052,44 @@ ESCUDOS.forEach(e => {
   b.addEventListener('click', () => usarEscudo(e));
   $('#escudos').appendChild(b);
 });
+
+/* personajes e ilustraciones: un archivo aparte que se descarga la primera vez que se abre la pestaña */
+let listasProm = null;
+function cargarListas() {
+  if (window.IMAGENES_LISTAS) return Promise.resolve(window.IMAGENES_LISTAS);
+  if (!listasProm) listasProm = new Promise((ok, mal) => {
+    const sc = document.createElement('script'); sc.src = 'assets/imagenes-listas.js';
+    sc.onload = () => ok(window.IMAGENES_LISTAS || []); sc.onerror = () => { listasProm = null; mal(new Error('sin conexión')); };
+    document.head.appendChild(sc);
+  });
+  return listasProm;
+}
+async function construirListas() {
+  const cont = $('#listas');
+  try {
+    const grupos = await cargarListas(); cont.innerHTML = '';
+    grupos.forEach(g => {
+      const h = document.createElement('h4'); h.className = 'grupo'; h.textContent = g.grupo;
+      const grid = document.createElement('div'); grid.className = 'escudos'; grid.setAttribute('role', 'group'); grid.setAttribute('aria-label', g.grupo);
+      g.items.forEach(it => {
+        const b = document.createElement('button'); b.type = 'button'; b.dataset.id = it.id; b.title = it.nombre; b.setAttribute('aria-pressed', 'false');
+        b.setAttribute('aria-label', 'Poner ' + it.nombre);
+        const img = document.createElement('img'); img.src = it.url; img.alt = ''; img.loading = 'lazy'; b.appendChild(img);
+        b.addEventListener('click', () => usarLista(it));
+        grid.appendChild(b);
+      });
+      cont.append(h, grid);
+    });
+  } catch (e) {
+    listasPedidas = false;
+    cont.innerHTML = '<p class="vacio">No se pudieron cargar las imágenes. Revisa tu conexión y vuelve a abrir esta pestaña.</p>';
+  }
+}
+async function usarLista(it) {
+  const id = 'lst-' + it.id;
+  if (!IMAGENES.has(id)) await cargarImagenData(id, it.nombre, it.url);
+  if (IMAGENES.has(id)) empezarImagen(id);
+}
 
 /* guardar y descargar */
 const descargar = (url, nombre) => { const a = document.createElement('a'); a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove(); };
@@ -1091,6 +1150,7 @@ const AYUDAS = {
   '#btn-rehacer': 'Vuelve a hacer lo que deshiciste (Ctrl + Y).',
   '#btn-abrir': 'Abre un diseño que guardaste antes (el archivo .json de «Guardar diseño»).',
   '#btn-nuevo': 'Borra todo y vuelve a la alcancía de barro natural.',
+  '#btn-pegar-ed': 'Deja la imagen justo donde la estás viendo.',
   '#in-texto': 'Escribe el texto que irá en la alcancía (hasta 18 letras).',
   '#in-fuente': 'Cambia el tipo de letra.',
   '#in-color': 'Cambia el color de este detalle.',
@@ -1107,6 +1167,7 @@ const AYUDA_TITULOS = {
   'Colores': 'Paso 1: elige la parte (Todo, Cuerpo, Nariz, Orejas o Cola). Paso 2: toca un color de la paleta, o crea uno con «Otro color».',
   'Acabado del cuerpo': 'Liso deja un solo color. Lunares, Rayas y Corazones dibujan un patrón sobre el cuerpo; su color se cambia abajo, en «Color del dibujo».',
   'Tus imágenes': 'Sube una imagen y pasa el cursor por la alcancía: ahí aparece. Rueda del ratón = tamaño. Flechas ← → = inclinar (con Shift, más fino). Clic = pegar. Esc = cancelar.',
+  'Personajes e ilustraciones': 'Personajes listos para pegar. Se usan igual que una imagen subida: tócalos, ajusta el tamaño y el giro con la barra de abajo y haz clic en la alcancía para dejarlos ahí.',
   'Escudos de equipos': 'Escudos listos para usar. Toca uno y colócalo igual que una imagen: cursor sobre la alcancía, rueda para el tamaño, flechas para inclinar y clic para pegar.',
 };
 $$('.paneles h3').forEach(h => {
@@ -1208,6 +1269,10 @@ async function asegurarImagenes(sn, subidas = {}) {
   for (const d of sn.detalles) {
     if (d.tipo !== 'imagen' || IMAGENES.has(d.imagen)) continue;
     if (d.imagen.startsWith('esc-')) { const e = ESCUDOS.find(x => 'esc-' + x.id === d.imagen); if (e) await cargarImagenData(d.imagen, e.nombre, e.url); }
+    else if (d.imagen.startsWith('lst-')) {
+      const grupos = await cargarListas().catch(() => []); const it = grupos.flatMap(g => g.items).find(x => 'lst-' + x.id === d.imagen);
+      if (it) await cargarImagenData(d.imagen, it.nombre, it.url);
+    }
     else if (subidas[d.imagen] && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(subidas[d.imagen].png || '')) {
       if (await cargarImagenData(d.imagen, String(subidas[d.imagen].nombre || 'imagen').slice(0, 40), subidas[d.imagen].png)) agregarABiblioteca(d.imagen);
     }
@@ -1220,14 +1285,14 @@ async function asegurarImagenes(sn, subidas = {}) {
 const CLAVE_AUTO = 'mei-alcancias-diseno-v1';
 function programarGuardado() { if (sinAuto || !modelos.m) return; clearTimeout(tAuto); tAuto = setTimeout(guardarAuto, 800); }
 function imagenesSubidas() {
-  const usadas = new Set(estado.detalles.filter(d => d.tipo === 'imagen' && !d.imagen.startsWith('esc-')).map(d => d.imagen));
+  const usadas = new Set(estado.detalles.filter(d => d.tipo === 'imagen' && !d.imagen.startsWith('esc-') && !d.imagen.startsWith('lst-')).map(d => d.imagen));
   return Object.fromEntries([...usadas].filter(id => IMAGENES.has(id)).map(id => [id, { nombre: IMAGENES.get(id).nombre, png: IMAGENES.get(id).canvas.toDataURL('image/png') }]));
 }
 function guardarAuto() {
   try {
     const sn = instantanea(); sn.imagenes = imagenesSubidas();
     try { localStorage.setItem(CLAVE_AUTO, JSON.stringify(sn)); }
-    catch (e) { delete sn.imagenes; sn.detalles = sn.detalles.filter(d => d.tipo !== 'imagen' || d.imagen.startsWith('esc-')); localStorage.setItem(CLAVE_AUTO, JSON.stringify(sn)); }
+    catch (e) { delete sn.imagenes; sn.detalles = sn.detalles.filter(d => d.tipo !== 'imagen' || d.imagen.startsWith('esc-') || d.imagen.startsWith('lst-')); localStorage.setItem(CLAVE_AUTO, JSON.stringify(sn)); }
   } catch (e) { /* sin almacenamiento disponible: el diseño sigue funcionando */ }
 }
 
@@ -1300,8 +1365,8 @@ const PRESETS = [
   { id: 'noche', nombre: 'Noche de estrellas', desc: 'Oscura y misteriosa, con luna y estrellas.', tam: 'm',
     colores: { cuerpo: '#3b2f2f', nariz: '#7a5244', orejas: '#7a5244', cola: '#7a5244' }, acabado: 'liso',
     detalles: [I('luna', '#fdf4e6', .27, .46, 1.2, -10), I('estrella', '#f7e0a1', .36, .58, .8, 8), I('destello', '#f7e0a1', .2, .6, .6)] },
-  { id: 'hincha-nacional', nombre: 'Hincha de Nacional', desc: 'Verde y blanca, con el escudo del equipo.', tam: 'm',
-    colores: { cuerpo: '#a8c9a0', nariz: '#ffffff', orejas: '#ffffff', cola: '#ffffff' }, acabado: 'liso',
+  { id: 'hincha-nacional', nombre: 'Hincha de Nacional', desc: 'Verde con rayas blancas y el escudo del equipo.', tam: 'm',
+    colores: { cuerpo: '#a8c9a0', nariz: '#ffffff', orejas: '#ffffff', cola: '#ffffff' }, acabado: 'rayas', colorPatron: '#ffffff',
     detalles: [{ tipo: 'imagen', imagen: 'esc-nacional', borde: false, u: .28, v: .5, tam: 1.4, rot: 0 }] },
   { id: 'con-tu-nombre', nombre: 'Con tu nombre', desc: 'Amarillo mantequilla para escribir el nombre que quieras.', tam: 'm',
     colores: { cuerpo: '#f7e0a1', nariz: '#f6b9d4', orejas: '#f6b9d4', cola: '#f6b9d4' }, acabado: 'liso',
@@ -1370,7 +1435,7 @@ async function construirCatalogo() {
 construirMuestras(); construirIconos(); refrescarMuestras(); ajustar(); pintarLienzo();
 const fuentes = ['Caveat', 'Cormorant Garamond', 'Fredoka', 'Playfair Display'].map(f => document.fonts.load(`600 40px "${f}"`).catch(() => {}));
 Promise.all([...promesas, Promise.all(fuentes)]).then(async () => {
-  ponerTamano("m"); camera.position.set(-0.22, 0.16, 0.36); ponerTamano("m");
+  camera.position.set(-0.22, 0.16, 0.36); ponerTamano("m", true);
   try { await construirCatalogo(); } catch (e) { console.warn('catálogo', e); $('#catalogo-grid').innerHTML = '<p class="vacio">No se pudo preparar el catálogo.</p>'; }
   try { await restaurarAuto(); } catch (e) { console.warn('diseño guardado', e); }
   $('#nube').classList.add('oculta'); pintarLienzo();

@@ -27,6 +27,16 @@ cambiar modelos: lista `PRESETS` en `src/visor_plantilla.html`.
 - **Guardado automático** en el navegador: al volver a abrir la página se retoma el último diseño.
 - **Guardar diseño / Abrir diseño** (archivo `.json`) y **Empezar de nuevo**.
 
+## Personajes e ilustraciones
+
+En la pestaña «Imágenes», debajo de los escudos, hay 19 personajes (Ben 10, Hello Kitty, Dragon Ball, Peppa Pig, Caillou y
+El Principito) tomados de `IMGS/` y limpiados con `herramientas/extraer_imagenes.py` (quedan en `assets/imagenes/`).
+Se descargan en un archivo aparte (`assets/imagenes-listas.js`) la primera vez que se abre la pestaña.
+**Son personajes con derechos de autor**: para vender productos con ellos hace falta licencia o permiso de sus dueños.
+
+La imagen que se está colocando usa la misma barra de edición que los íconos (tamaño, giro, vuelta alrededor y
+arriba/abajo), con «Pegar aquí» y «Cancelar».
+
 ## Escudos de equipos
 
 En la pestaña «Imágenes» hay un submódulo con 9 escudos (Medellín, América, Bucaramanga, Cali, Junior, Nacional,
