@@ -14,6 +14,19 @@ Doble clic en `index.html` (necesita internet para Three.js y las tipografías d
 3. **Rueda del ratón**: más grande o más pequeña. **Flechas ← →**: inclinarla (con Shift, más fino). **Clic**: pegarla. **Esc**: cancelar.
 4. Ya pegada, se puede mover, girar o agrandar desde los controles, copiar al otro lado o quitar.
 
+## Catálogo de modelos
+
+La sección «Catálogo» muestra 8 diseños listos (Clásica de barro, Rosa con lunares, Menta y corazones, Celeste a rayas,
+Floral, Noche de estrellas, Hincha de Nacional y Con tu nombre). Las fotos se generan solas con el mismo visor 3D al abrir
+la página. «Personalizar» carga el modelo en el visor; «Pedir este» abre WhatsApp con el mensaje listo. Para agregar o
+cambiar modelos: lista `PRESETS` en `src/visor_plantilla.html`.
+
+## Comodidades del visor
+
+- **Deshacer / rehacer** (botones ↶ ↷ o Ctrl + Z / Ctrl + Y) y **Supr** para quitar el detalle elegido.
+- **Guardado automático** en el navegador: al volver a abrir la página se retoma el último diseño.
+- **Guardar diseño / Abrir diseño** (archivo `.json`) y **Empezar de nuevo**.
+
 ## Escudos de equipos
 
 En la pestaña «Imágenes» hay un submódulo con 9 escudos (Medellín, América, Bucaramanga, Cali, Junior, Nacional,

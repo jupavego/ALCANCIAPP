@@ -279,6 +279,31 @@ main{align-items:stretch}
   .tarjeta.ancha{padding:16px}
   .ed-fila strong{min-width:0}
 }
+
+/* ---------- deshacer / rehacer, pie del panel y catálogo ---------- */
+.barra-historial{position:absolute;left:14px;top:14px;display:flex;gap:6px;z-index:2}
+.redondo{width:40px;height:40px;border-radius:50%;border:2px solid var(--linea);background:var(--papel);font:700 20px/1 'Nunito',sans-serif;color:var(--linea);padding:0}
+.redondo:hover:not(:disabled){background:var(--rosa-2)}
+.redondo:disabled{opacity:.35;cursor:default}
+.pie-panel{flex:none;display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;padding:8px 2px 10px;border-top:2px dotted var(--linea-suave)}
+.titulo-seccion{font-size:32px;text-align:center}
+.sub-seccion{text-align:center;color:var(--linea-suave);margin:4px 0 0}
+.catalogo{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:16px}
+@media (max-width:900px){.catalogo{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.modelo{background:var(--papel);border:2px solid var(--linea);border-radius:var(--radio);box-shadow:var(--sombra);padding:10px 10px 14px;
+  display:flex;flex-direction:column;gap:6px;text-align:center;transition:transform .15s}
+.modelo:hover{transform:translateY(-3px)}
+.modelo img{width:100%;aspect-ratio:1;object-fit:contain;background:radial-gradient(circle,#fbc9de 0 52%,var(--rosa-2) 53% 100%);border-radius:14px}
+.modelo h3{font-size:23px;margin:2px 0 0}
+.modelo p{margin:0;font-size:13.5px;color:var(--linea-suave);flex:1}
+.modelo .fila{justify-content:center;margin-top:6px}
+@media (max-width:600px){
+  .barra-historial{left:8px;top:8px}
+  .redondo{width:36px;height:36px}
+  .catalogo{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .modelo h3{font-size:19px}
+  .modelo .btn{padding:6px 10px;font-size:13px}
+}
 footer{text-align:center;color:var(--linea-suave);font-size:13px;padding:0 16px 26px}
 footer b{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--linea)}
 .sr{position:absolute;left:-9999px}
@@ -292,8 +317,9 @@ footer b{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--linea
   </a>
   <nav class="menu" aria-label="Secciones">
     <a href="#alcancias"><img src="assets/iconos/cerdito.png" alt=""><span>Alcancías</span></a>
+    <a href="#catalogo"><img src="assets/iconos/galeria.png" alt=""><span>Catálogo</span></a>
     <a href="#encargos"><img src="assets/iconos/encargos.png" alt=""><span>Encargos</span></a>
-    <a href="#contacto"><img src="assets/iconos/sobre.png" alt=""><span>Contacto</span></a>
+    <a href="#contacto"><img src="assets/iconos/sobre.svg" alt=""><span>Contacto</span></a>
   </nav>
 </header>
 
@@ -320,6 +346,10 @@ footer b{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--linea
       <button type="button" id="t-der" aria-label="Inclinar a la derecha">↻</button>
       <button type="button" id="t-pegar" class="pegar">Pegar</button>
       <button type="button" id="t-cancelar" aria-label="Cancelar">✕</button>
+    </div>
+    <div class="barra-historial" role="group" aria-label="Deshacer y rehacer">
+      <button type="button" class="redondo" id="btn-deshacer" aria-label="Deshacer" disabled>↶</button>
+      <button type="button" class="redondo" id="btn-rehacer" aria-label="Rehacer" disabled>↷</button>
     </div>
     <div class="barra-acciones">
       <button class="btn" id="btn-guardar" title="Descarga tu diseño para retomarlo o enviarlo">Guardar diseño</button>
@@ -421,9 +451,20 @@ footer b{font-family:'Cormorant Garamond',serif;font-size:18px;color:var(--linea
           <div class="escudos" id="escudos" role="group" aria-label="Escudos de equipos"></div>
         </div>
       </div>
+      <div class="pie-panel">
+        <button type="button" class="btn mini" id="btn-abrir">Abrir diseño</button>
+        <input type="file" id="in-diseno" accept="application/json,.json" hidden>
+        <button type="button" class="btn mini" id="btn-nuevo">Empezar de nuevo</button>
+      </div>
     </div>
   </aside>
 </main>
+<section class="seccion" id="catalogo" aria-labelledby="t-catalogo">
+  <h2 class="titulo-seccion" id="t-catalogo">Catálogo de modelos</h2>
+  <p class="sub-seccion">Elige uno como punto de partida: personalízalo a tu gusto o pídelo tal cual.</p>
+  <div class="catalogo" id="catalogo-grid" aria-live="polite"><p class="vacio">Preparando el catálogo…</p></div>
+</section>
+
 <img class="divisor" src="assets/iconos/guirnalda.png" alt="">
 
 <section class="seccion" id="encargos" aria-labelledby="t-encargos">
@@ -619,6 +660,7 @@ function mascaraNariz(t) {
 }
 
 function pintarLienzo() {
+  programarGuardado();
   bctx.clearRect(0, 0, W, H);
   bctx.fillStyle = estado.colores.cuerpo; bctx.fillRect(0, 0, W, H);
 
@@ -799,7 +841,7 @@ cv.addEventListener('pointerup', e => {
     return;
   }
   const d = detalleSel(); if (!d) return;
-  d.u = q.u; d.v = q.v; sincronizarControles(); pintarLienzo();
+  guardarPaso('mover' + d.id); d.u = q.u; d.v = q.v; sincronizarControles(); pintarLienzo();
 });
 
 /* pestañas del panel */
@@ -827,6 +869,7 @@ function construirMuestras() {
   });
 }
 function aplicarColor(hex) {
+  guardarPaso('color-' + estado.parte);
   const t = estado.parte, c = estado.colores;
   if (t === 'todo') { c.cuerpo = c.nariz = c.orejas = c.cola = hex; } else c[t] = hex;
   matOrejas.color = linear(c.orejas); matCola.color = linear(c.cola);
@@ -841,12 +884,12 @@ $$('#partes .chip').forEach(b => b.addEventListener('click', () => {
   estado.parte = b.dataset.p; $$('#partes .chip').forEach(x => x.setAttribute('aria-pressed', x === b)); refrescarMuestras();
 }));
 $('#color-libre').addEventListener('input', e => aplicarColor(e.target.value));
-$$('#tamanos .chip').forEach(b => b.addEventListener('click', () => ponerTamano(b.dataset.t)));
+$$('#tamanos .chip').forEach(b => b.addEventListener('click', () => { guardarPaso('tam'); ponerTamano(b.dataset.t); }));
 $$('#acabados .chip').forEach(b => b.addEventListener('click', () => {
-  estado.acabado = b.dataset.a; $$('#acabados .chip').forEach(x => x.setAttribute('aria-pressed', x === b));
+  guardarPaso('acabado'); estado.acabado = b.dataset.a; $$('#acabados .chip').forEach(x => x.setAttribute('aria-pressed', x === b));
   $('#fila-patron').hidden = estado.acabado === 'liso'; pintarLienzo();
 }));
-$('#color-patron').addEventListener('input', e => { estado.colorPatron = e.target.value; pintarLienzo(); });
+$('#color-patron').addEventListener('input', e => { guardarPaso('patron'); estado.colorPatron = e.target.value; pintarLienzo(); });
 
 /* íconos */
 function miniatura(canvas, d) {
@@ -869,6 +912,7 @@ function construirIconos() {
   });
 }
 function agregar(base) {
+  guardarPaso();
   const n = estado.detalles.length;
   const d = { id: estado.siguienteId++, tipo: 'icono', icono: 'corazon', texto: 'Mei', fuente: 'Caveat', color: '#e58bb3', borde: true,
     u: 0.27 + (n % 3) * 0.06, v: 0.5 + ((n % 2) ? 0.08 : -0.04), tam: 1, rot: 0, ...base };
@@ -898,13 +942,13 @@ function sincronizarControles() {
   $('#in-borde').setAttribute('aria-pressed', d.borde);
 }
 function enlazar(id, campo, conv = v => v, refrescarTodo = false) {
-  $(id).addEventListener('input', e => { const d = detalleSel(); if (!d) return; d[campo] = conv(e.target.value); pintarLienzo(); if (refrescarTodo) refrescarLista(); });
+  $(id).addEventListener('input', e => { const d = detalleSel(); if (!d) return; guardarPaso('ed-' + campo + d.id); d[campo] = conv(e.target.value); pintarLienzo(); if (refrescarTodo) refrescarLista(); });
 }
 enlazar('#in-texto', 'texto', v => v || ' ', true); enlazar('#in-fuente', 'fuente', v => v, true); enlazar('#in-color', 'color', v => v, true);
 enlazar('#in-tam', 'tam', Number); enlazar('#in-rot', 'rot', Number); enlazar('#in-h', 'u', Number); enlazar('#in-v', 'v', Number);
-$('#in-borde').addEventListener('click', () => { const d = detalleSel(); if (!d) return; d.borde = !d.borde; sincronizarControles(); pintarLienzo(); refrescarLista(); });
+$('#in-borde').addEventListener('click', () => { const d = detalleSel(); if (!d) return; guardarPaso(); d.borde = !d.borde; sincronizarControles(); pintarLienzo(); refrescarLista(); });
 $('#btn-texto').addEventListener('click', () => agregar({ tipo: 'texto', color: '#7a5244' }));
-$('#btn-borrar').addEventListener('click', () => { estado.detalles = estado.detalles.filter(d => d.id !== estado.sel); estado.sel = estado.detalles.length ? estado.detalles[estado.detalles.length - 1].id : null; pintarLienzo(); refrescarLista(); });
+$('#btn-borrar').addEventListener('click', () => { guardarPaso(); estado.detalles = estado.detalles.filter(d => d.id !== estado.sel); estado.sel = estado.detalles.length ? estado.detalles[estado.detalles.length - 1].id : null; pintarLienzo(); refrescarLista(); });
 $('#btn-espejo').addEventListener('click', () => { const d = detalleSel(); if (!d) return; agregar({ ...d, id: undefined, u: 1 - d.u, rot: -d.rot }); });
 
 /* imágenes del cliente */
@@ -954,7 +998,7 @@ $('#in-archivo').addEventListener('change', e => {
     const k = Math.min(1, 1024 / Math.max(im.naturalWidth, im.naturalHeight));
     const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(im.naturalWidth * k)); c.height = Math.max(1, Math.round(im.naturalHeight * k));
     c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
-    const id = 'img' + (IMAGENES.size + 1);
+    const id = nuevoIdImagen();
     IMAGENES.set(id, { nombre: f.name.replace(/\.[^.]+$/, ''), canvas: c, w: c.width, h: c.height });
     agregarABiblioteca(id); empezarImagen(id);
   };
@@ -1014,12 +1058,12 @@ function resumenDiseno() {
   return l.join('\n');
 }
 function avisar(texto) { const a = $('#aviso'); a.textContent = texto; a.classList.add('ver'); clearTimeout(avisar.t); avisar.t = setTimeout(() => a.classList.remove('ver'), 5200); }
-$('#btn-pedir').addEventListener('click', async () => {
-  const texto = resumenDiseno();
-  try { await navigator.clipboard.writeText(texto); avisar('Copiamos el resumen de tu diseño. Pégalo en el chat de WhatsApp.'); }
-  catch (e) { avisar('No pudimos copiar el resumen. Descarga la foto y cuéntanos tu diseño en el chat.'); }
+async function pedirPorWhatsApp(texto, avisoOk) {
+  try { await navigator.clipboard.writeText(texto); avisar(avisoOk); }
+  catch (e) { avisar('No pudimos copiar el mensaje. Abre el chat y cuéntanos qué modelo quieres.'); }
   window.open(WHATSAPP, '_blank', 'noopener');
-});
+}
+$('#btn-pedir').addEventListener('click', () => pedirPorWhatsApp(resumenDiseno(), 'Copiamos el resumen de tu diseño. Pégalo en el chat de WhatsApp.'));
 
 /* ================= ayudas: cómo se usa cada pestaña y cada control ================= */
 const AYUDAS = {
@@ -1043,6 +1087,10 @@ const AYUDAS = {
   '#btn-cancelar-img': 'Deja de colocar la imagen sin pegarla (también sirve la tecla Esc).',
   '#btn-guardar': 'Descarga un archivo con tu diseño para retomarlo después.',
   '#btn-foto': 'Guarda una foto (PNG) de tu alcancía tal como la ves ahora.',
+  '#btn-deshacer': 'Deshace el último cambio (Ctrl + Z).',
+  '#btn-rehacer': 'Vuelve a hacer lo que deshiciste (Ctrl + Y).',
+  '#btn-abrir': 'Abre un diseño que guardaste antes (el archivo .json de «Guardar diseño»).',
+  '#btn-nuevo': 'Borra todo y vuelve a la alcancía de barro natural.',
   '#in-texto': 'Escribe el texto que irá en la alcancía (hasta 18 letras).',
   '#in-fuente': 'Cambia el tipo de letra.',
   '#in-color': 'Cambia el color de este detalle.',
@@ -1102,6 +1150,203 @@ document.addEventListener('click', e => { const el = e.target.closest('.pista');
 document.addEventListener('keydown', e => { if (e.key === 'Escape') quitarTip(); });
 window.addEventListener('scroll', quitarTip, true);
 
+/* ================= historial, guardado automático, abrir diseño y catálogo ================= */
+const historia = [], futuro = [];
+let ultimaClave = '', ultimoPaso = 0, sinAuto = false, tAuto = 0;
+const DISENO_INICIAL = () => ({ tam: 'm', colores: { cuerpo: BARRO, nariz: BARRO, orejas: BARRO, cola: BARRO }, acabado: 'liso',
+  colorPatron: '#fdf4e6', detalles: [], siguienteId: 1, sel: null });
+let contadorImg = 0;
+function nuevoIdImagen() { while (IMAGENES.has('img' + (++contadorImg))); return 'img' + contadorImg; }
+
+function instantanea() {
+  return JSON.parse(JSON.stringify({ tam: estado.tam, colores: estado.colores, acabado: estado.acabado, colorPatron: estado.colorPatron,
+    detalles: estado.detalles, siguienteId: estado.siguienteId, sel: estado.sel }));
+}
+function aplicarInstantanea(sn, rapido = false) {
+  Object.assign(estado, { tam: sn.tam, colores: { ...sn.colores }, acabado: sn.acabado, colorPatron: sn.colorPatron,
+    detalles: sn.detalles.map(d => ({ ...d })), siguienteId: sn.siguienteId, sel: sn.sel ?? null });
+  if (!estado.detalles.some(d => d.id === estado.sel)) estado.sel = estado.detalles.length ? estado.detalles[estado.detalles.length - 1].id : null;
+  matOrejas.color = linear(estado.colores.orejas); matCola.color = linear(estado.colores.cola);
+  $$('#acabados .chip').forEach(x => x.setAttribute('aria-pressed', x.dataset.a === estado.acabado));
+  $('#fila-patron').hidden = estado.acabado === 'liso'; $('#color-patron').value = estado.colorPatron;
+  ponerTamano(estado.tam);
+  pintarLienzo();
+  if (!rapido) { refrescarMuestras(); refrescarLista(); }
+}
+function guardarPaso(clave = '') {
+  if (sinAuto) return;
+  const ahora = performance.now();
+  if (clave && clave === ultimaClave && ahora - ultimoPaso < 900) { ultimoPaso = ahora; return; }   // un deslizador arrastrado cuenta como un solo cambio
+  ultimaClave = clave; ultimoPaso = ahora;
+  historia.push(instantanea()); if (historia.length > 40) historia.shift(); futuro.length = 0; refrescarHistorial();
+}
+function refrescarHistorial() { $('#btn-deshacer').disabled = !historia.length; $('#btn-rehacer').disabled = !futuro.length; }
+function deshacer() { if (!historia.length) return; futuro.push(instantanea()); aplicarInstantanea(historia.pop()); ultimaClave = ''; refrescarHistorial(); }
+function rehacer() { if (!futuro.length) return; historia.push(instantanea()); aplicarInstantanea(futuro.pop()); ultimaClave = ''; refrescarHistorial(); }
+$('#btn-deshacer').addEventListener('click', deshacer);
+$('#btn-rehacer').addEventListener('click', rehacer);
+window.addEventListener('keydown', e => {
+  if (fantasma.activo) return;
+  const t = e.target, escribiendo = t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable);
+  if ((e.ctrlKey || e.metaKey) && !escribiendo) {
+    const k = e.key.toLowerCase();
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); deshacer(); } else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); rehacer(); }
+  } else if ((e.key === 'Delete' || e.key === 'Backspace') && !escribiendo && detalleSel()) { e.preventDefault(); $('#btn-borrar').click(); }
+});
+
+/* imágenes que un diseño necesita (escudos o subidas por el cliente) */
+function cargarImagenData(id, nombre, url) {
+  return new Promise(ok => {
+    const im = new Image();
+    im.onload = () => { const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; c.getContext('2d').drawImage(im, 0, 0);
+      IMAGENES.set(id, { nombre, canvas: c, w: c.width, h: c.height }); ok(true); };
+    im.onerror = () => ok(false);
+    im.src = url;
+  });
+}
+async function asegurarImagenes(sn, subidas = {}) {
+  for (const d of sn.detalles) {
+    if (d.tipo !== 'imagen' || IMAGENES.has(d.imagen)) continue;
+    if (d.imagen.startsWith('esc-')) { const e = ESCUDOS.find(x => 'esc-' + x.id === d.imagen); if (e) await cargarImagenData(d.imagen, e.nombre, e.url); }
+    else if (subidas[d.imagen] && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(subidas[d.imagen].png || '')) {
+      if (await cargarImagenData(d.imagen, String(subidas[d.imagen].nombre || 'imagen').slice(0, 40), subidas[d.imagen].png)) agregarABiblioteca(d.imagen);
+    }
+  }
+  sn.detalles = sn.detalles.filter(d => d.tipo !== 'imagen' || IMAGENES.has(d.imagen));   // sin su imagen, el detalle no se puede dibujar
+  return sn;
+}
+
+/* guardado automático en este navegador */
+const CLAVE_AUTO = 'mei-alcancias-diseno-v1';
+function programarGuardado() { if (sinAuto || !modelos.m) return; clearTimeout(tAuto); tAuto = setTimeout(guardarAuto, 800); }
+function imagenesSubidas() {
+  const usadas = new Set(estado.detalles.filter(d => d.tipo === 'imagen' && !d.imagen.startsWith('esc-')).map(d => d.imagen));
+  return Object.fromEntries([...usadas].filter(id => IMAGENES.has(id)).map(id => [id, { nombre: IMAGENES.get(id).nombre, png: IMAGENES.get(id).canvas.toDataURL('image/png') }]));
+}
+function guardarAuto() {
+  try {
+    const sn = instantanea(); sn.imagenes = imagenesSubidas();
+    try { localStorage.setItem(CLAVE_AUTO, JSON.stringify(sn)); }
+    catch (e) { delete sn.imagenes; sn.detalles = sn.detalles.filter(d => d.tipo !== 'imagen' || d.imagen.startsWith('esc-')); localStorage.setItem(CLAVE_AUTO, JSON.stringify(sn)); }
+  } catch (e) { /* sin almacenamiento disponible: el diseño sigue funcionando */ }
+}
+
+/* validar un diseño que viene de un archivo o del navegador */
+const HEX = /^#[0-9a-fA-F]{6}$/;
+const FUENTES_OK = ['Caveat', 'Cormorant Garamond', 'Fredoka', 'Playfair Display'];
+const num = (v, a, b, d) => (Number.isFinite(+v) ? Math.min(b, Math.max(a, +v)) : d);
+function validarDiseno(d) {
+  if (!d || typeof d !== 'object' || !['s', 'm', 'l'].includes(d.tam)) return null;
+  const c = d.colores || {}, col = (v) => (HEX.test(v) ? v : BARRO);
+  const sn = { tam: d.tam, colores: { cuerpo: col(c.cuerpo), nariz: col(c.nariz), orejas: col(c.orejas), cola: col(c.cola) },
+    acabado: ['liso', 'lunares', 'rayas', 'corazones'].includes(d.acabado) ? d.acabado : 'liso', colorPatron: col(d.colorPatron), detalles: [], siguienteId: 1, sel: null };
+  (Array.isArray(d.detalles) ? d.detalles : []).slice(0, 60).forEach((x, i) => {
+    if (!x || typeof x !== 'object') return;
+    const base = { id: i + 1, u: num(x.u, .001, .999, .3), v: num(x.v, .12, .88, .5), tam: num(x.tam, .15, 4, 1), rot: num(x.rot, -180, 180, 0), borde: !!x.borde };
+    if (x.tipo === 'texto') sn.detalles.push({ ...base, tipo: 'texto', texto: String(x.texto || ' ').slice(0, 18), fuente: FUENTES_OK.includes(x.fuente) ? x.fuente : 'Caveat', color: col(x.color) });
+    else if (x.tipo === 'icono' && ICONOS[x.icono]) sn.detalles.push({ ...base, tipo: 'icono', icono: x.icono, color: col(x.color) });
+    else if (x.tipo === 'imagen' && /^[\w-]{1,40}$/.test(String(x.imagen))) sn.detalles.push({ ...base, tipo: 'imagen', imagen: String(x.imagen), borde: false });
+  });
+  sn.siguienteId = sn.detalles.length + 1; sn.sel = sn.detalles.length ? sn.detalles[sn.detalles.length - 1].id : null;
+  return sn;
+}
+async function cargarDiseno(origen, subidas, aviso) {
+  const sn = validarDiseno(origen); if (!sn) { avisar('Ese archivo no parece un diseño de MEI.'); return false; }
+  await asegurarImagenes(sn, subidas || {});
+  guardarPaso(); aplicarInstantanea(sn); if (aviso) avisar(aviso); return true;
+}
+async function restaurarAuto() {
+  let g = null; try { g = JSON.parse(localStorage.getItem(CLAVE_AUTO) || 'null'); } catch (e) { g = null; }
+  if (!g) return;
+  const vacio = !g.detalles?.length && g.acabado === 'liso' && g.tam === 'm' && ['cuerpo', 'nariz', 'orejas', 'cola'].every(k => g.colores?.[k] === BARRO);
+  if (vacio) return;
+  const sn = validarDiseno(g); if (!sn) return;
+  await asegurarImagenes(sn, g.imagenes || {});
+  aplicarInstantanea(sn); historia.length = 0; refrescarHistorial();
+  avisar('Retomamos tu último diseño. Si quieres otro, toca «Empezar de nuevo».');
+}
+$('#btn-abrir').addEventListener('click', () => $('#in-diseno').click());
+$('#in-diseno').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  if (f.size > 25e6) { avisar('Ese archivo es demasiado grande.'); return; }
+  try { const d = JSON.parse(await f.text()); await cargarDiseno(d, d.imagenes, 'Abrimos tu diseño.'); }
+  catch (err) { avisar('No pudimos leer ese archivo.'); }
+});
+$('#btn-nuevo').addEventListener('click', () => {
+  if (!estado.detalles.length && estado.acabado === 'liso' && Object.values(estado.colores).every(c => c === BARRO)) { avisar('Ya estás en la alcancía de barro natural.'); return; }
+  if (!confirm('¿Empezar de nuevo? Se quita lo que has hecho en este diseño (puedes deshacerlo con Ctrl + Z).')) return;
+  guardarPaso(); aplicarInstantanea(DISENO_INICIAL());
+});
+
+/* catálogo de modelos */
+const B = c => ({ cuerpo: c, nariz: c, orejas: c, cola: c });
+const T = (texto, color, u, v, tam, rot, fuente = 'Caveat') => ({ tipo: 'texto', texto, fuente, color, borde: true, u, v, tam, rot });
+const I = (icono, color, u, v, tam, rot = 0) => ({ tipo: 'icono', icono, color, borde: true, u, v, tam, rot });
+const PRESETS = [
+  { id: 'clasica', nombre: 'Clásica de barro', desc: 'El barro natural, con un mensaje escrito a mano.', tam: 'm', colores: B(BARRO), acabado: 'liso',
+    detalles: [T('Mis ahorros', '#fdf4e6', .28, .56, 1.05, -6)] },
+  { id: 'rosa-lunares', nombre: 'Rosa con lunares', desc: 'Dulce y alegre, con un corazón en el costado.', tam: 'm',
+    colores: { cuerpo: '#f6b9d4', nariz: '#e58bb3', orejas: '#e58bb3', cola: '#e58bb3' }, acabado: 'lunares', colorPatron: '#fdf4e6',
+    detalles: [I('corazon', '#e58bb3', .28, .5, 1.3, -8)] },
+  { id: 'menta-corazones', nombre: 'Menta y corazones', desc: 'Fresca y tierna, con tu nombre en grande.', tam: 'm',
+    colores: { cuerpo: '#bfe3d6', nariz: '#f6b9d4', orejas: '#f6b9d4', cola: '#f6b9d4' }, acabado: 'corazones', colorPatron: '#ffffff',
+    detalles: [T('Mei', '#e58bb3', .28, .55, 1.3, -5, 'Fredoka')] },
+  { id: 'celeste-rayas', nombre: 'Celeste a rayas', desc: 'Rayas suaves y una estrella dorada.', tam: 'm',
+    colores: { cuerpo: '#bcd9ee', nariz: '#fdf4e6', orejas: '#fdf4e6', cola: '#fdf4e6' }, acabado: 'rayas', colorPatron: '#ffffff',
+    detalles: [I('estrella', '#f7e0a1', .28, .5, 1.3, 6)] },
+  { id: 'floral', nombre: 'Floral', desc: 'Durazno con flores y un destello.', tam: 'm',
+    colores: { cuerpo: '#f4b79a', nariz: '#f08a7b', orejas: '#f08a7b', cola: '#f08a7b' }, acabado: 'liso',
+    detalles: [I('flor', '#fdf4e6', .22, .46, 1.1), I('flor', '#f7e0a1', .33, .58, .9, 15), I('destello', '#fdf4e6', .31, .38, .6)] },
+  { id: 'noche', nombre: 'Noche de estrellas', desc: 'Oscura y misteriosa, con luna y estrellas.', tam: 'm',
+    colores: { cuerpo: '#3b2f2f', nariz: '#7a5244', orejas: '#7a5244', cola: '#7a5244' }, acabado: 'liso',
+    detalles: [I('luna', '#fdf4e6', .27, .46, 1.2, -10), I('estrella', '#f7e0a1', .36, .58, .8, 8), I('destello', '#f7e0a1', .2, .6, .6)] },
+  { id: 'hincha-nacional', nombre: 'Hincha de Nacional', desc: 'Verde y blanca, con el escudo del equipo.', tam: 'm',
+    colores: { cuerpo: '#a8c9a0', nariz: '#ffffff', orejas: '#ffffff', cola: '#ffffff' }, acabado: 'liso',
+    detalles: [{ tipo: 'imagen', imagen: 'esc-nacional', borde: false, u: .28, v: .5, tam: 1.4, rot: 0 }] },
+  { id: 'con-tu-nombre', nombre: 'Con tu nombre', desc: 'Amarillo mantequilla para escribir el nombre que quieras.', tam: 'm',
+    colores: { cuerpo: '#f7e0a1', nariz: '#f6b9d4', orejas: '#f6b9d4', cola: '#f6b9d4' }, acabado: 'liso',
+    detalles: [T('Tu nombre', '#e58bb3', .28, .52, 1.15, -4, 'Fredoka')] },
+];
+function presetASnapshot(p) {
+  const sn = validarDiseno({ tam: p.tam, colores: p.colores, acabado: p.acabado, colorPatron: p.colorPatron || '#fdf4e6', detalles: p.detalles });
+  return sn;
+}
+async function construirCatalogo() {
+  const grid = $('#catalogo-grid'); grid.innerHTML = '';
+  const actual = instantanea(), posicion = camera.position.clone(), blanco = controls.target.clone();
+  sinAuto = true;
+  const miniaturas = [];
+  for (const p of PRESETS) {
+    const sn = await asegurarImagenes(presetASnapshot(p));
+    aplicarInstantanea(sn, true);
+    renderer.setSize(360, 360, false); camera.aspect = 1; camera.updateProjectionMatrix();
+    controls.target.set(0, ALTO.m * .46, 0); camera.position.set(-0.33, 0.11, 0.13); camera.lookAt(controls.target);
+    renderer.render(scene, camera);
+    miniaturas.push(cv.toDataURL('image/png'));
+  }
+  aplicarInstantanea(actual, true); camera.position.copy(posicion); controls.target.copy(blanco); ajustar(); controls.update();
+  sinAuto = false;
+  PRESETS.forEach((p, i) => {
+    const a = document.createElement('article'); a.className = 'modelo';
+    const img = document.createElement('img'); img.src = miniaturas[i]; img.alt = 'Alcancía ' + p.nombre; img.loading = 'lazy';
+    const h = document.createElement('h3'); h.textContent = p.nombre;
+    const d = document.createElement('p'); d.textContent = p.desc;
+    const f = document.createElement('div'); f.className = 'fila';
+    const b1 = document.createElement('button'); b1.type = 'button'; b1.className = 'btn mini primario'; b1.textContent = 'Personalizar';
+    b1.dataset.ayuda = 'Carga este modelo en el visor para cambiarle lo que quieras.';
+    const b2 = document.createElement('button'); b2.type = 'button'; b2.className = 'btn mini'; b2.textContent = 'Pedir este';
+    b2.dataset.ayuda = 'Abre WhatsApp con un mensaje listo para pedir este modelo.';
+    b1.addEventListener('click', async () => {
+      const sn = await asegurarImagenes(presetASnapshot(p)); guardarPaso(); aplicarInstantanea(sn);
+      irAPestana('color'); document.getElementById('alcancias').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      avisar('Cargamos «' + p.nombre + '». Cámbiale lo que quieras.');
+    });
+    b2.addEventListener('click', () => pedirPorWhatsApp('Hola, me interesa el modelo «' + p.nombre + '» (alcancía mediana). ¿Me cuentas precio y tiempo de entrega?',
+      'Copiamos el mensaje. Pégalo en el chat de WhatsApp.'));
+    f.append(b1, b2); a.append(img, h, d, f); grid.appendChild(a);
+  });
+}
+
 /* ================= decoración del escenario (línea de arte, como el sello) ================= */
 (function ruedo() {
   const L = '#6a4337';
@@ -1124,11 +1369,13 @@ window.addEventListener('scroll', quitarTip, true);
 /* ================= arranque ================= */
 construirMuestras(); construirIconos(); refrescarMuestras(); ajustar(); pintarLienzo();
 const fuentes = ['Caveat', 'Cormorant Garamond', 'Fredoka', 'Playfair Display'].map(f => document.fonts.load(`600 40px "${f}"`).catch(() => {}));
-Promise.all([...promesas, Promise.all(fuentes)]).then(() => {
+Promise.all([...promesas, Promise.all(fuentes)]).then(async () => {
   ponerTamano("m"); camera.position.set(-0.22, 0.16, 0.36); ponerTamano("m");
+  try { await construirCatalogo(); } catch (e) { console.warn('catálogo', e); $('#catalogo-grid').innerHTML = '<p class="vacio">No se pudo preparar el catálogo.</p>'; }
+  try { await restaurarAuto(); } catch (e) { console.warn('diseño guardado', e); }
   $('#nube').classList.add('oculta'); pintarLienzo();
 }).catch(err => { $('#nube').textContent = 'No se pudo cargar la alcancía: ' + err; });
-window.__mei = { estado, agregar, pintarLienzo, ponerTamano, camera, controls, IMAGENES, fantasma, empezarImagen, agregarABiblioteca, renderer, scene, sol, matCuerpo, matOrejas, matCola, linear }; // para pruebas
+window.__mei = { instantanea, aplicarInstantanea, deshacer, rehacer, PRESETS, historia, estado, agregar, pintarLienzo, ponerTamano, camera, controls, IMAGENES, fantasma, empezarImagen, agregarABiblioteca, renderer, scene, sol, matCuerpo, matOrejas, matCola, linear }; // para pruebas
 })();
 </script>
 </body>
